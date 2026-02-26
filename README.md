@@ -1,4 +1,4 @@
-# SeatSync — Hybrid Seat Booking Management System
+# BookMyDesk — Hybrid Seat Booking Management System
 
 A full-stack seat booking system for organizations with hybrid work schedules. Built with React + Node.js/Express + MongoDB.
 

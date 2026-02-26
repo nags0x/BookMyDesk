@@ -37,7 +37,7 @@ export default function Sidebar({ user, page, setPage, dark, toggleDark, onLogou
               {Icons.seat}
             </div>
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.05rem', letterSpacing: '-0.03em' }}>
-              SeatSync
+              BookMyDesk
             </span>
           </div>
         </div>

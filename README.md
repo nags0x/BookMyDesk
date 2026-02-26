@@ -6,47 +6,57 @@ A full-stack seat booking system for organizations with hybrid work schedules. B
 
 ### Prerequisites
 - Node.js v18+
-- MongoDB (local or Atlas connection string)
+- MongoDB (local or Atlas)
 - npm or yarn
 
-### 1. Clone & Install
+### 1. Project Setup
 
 ```bash
-# Install frontend deps
-cd frontend && npm install
+# Install dependencies
+npm run install:all
 
-# Install backend deps
-cd ../backend && npm install
-```
-
-### 2. Configure Environment
-
-```bash
-# Copy env files
+# Configure environment
 cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
+*Note: Update `backend/.env` with your `MONGODB_URI`.*
 
-Edit `backend/.env` with your MongoDB URI and JWT secret.
-
-### 3. Seed the Database
+### 2. Startup
 
 ```bash
-cd backend
+# Seed initial data (Admin and sample users)
 npm run seed
+
+# Start both servers (Root level)
+npm run dev
 ```
 
-### 4. Run Development Servers
+- **Frontend**: http://localhost:5173
+- **Backend**: http://localhost:5001
 
-```bash
-# Terminal 1 — Backend (port 5000)
-cd backend && npm run dev
+## Business Logic & Rules
 
-# Terminal 2 — Frontend (port 5173)
-cd frontend && npm run dev
-```
+- **Batch System**: Users are in Batch 1 or Batch 2.
+    - **Week 1**: B1 scheduled Mon-Wed, B2 scheduled Thu-Fri.
+    - **Week 2**: B2 scheduled Mon-Wed, B1 scheduled Thu-Fri.
+- **Seat Types**: 10 **Guaranteed** (for scheduled batch) and 10 **Buffer** (for everyone else).
+- **Booking Windows**:
+    - **Guaranteed**: Up to 14 days in advance.
+    - **Buffer**: Opens at **3:00 PM** the day before; closes at **9:00 AM** the day of.
+- **Check-in**: Must check in by **10:00 AM** or marked ABSENT (penalty applied to fairness score).
 
-Open http://localhost:5173
+## Database Schema (MongoDB/Mongoose)
+
+- **`User`**: Profile, email, fairness score, and batch/squad assignment.
+- **`Booking`**: Records of `userId`, `date`, `seatType` (Guaranteed/Buffer), and `status` (Booked/CheckedIn/Absent).
+- **`Inventory`**: Daily snapshots of total vs. booked seats.
+- **`CycleConfig`**: Global rules (seat counts, deadline times, cycle start date).
+- **`Holiday`**: Office-wide closures.
+
+## Tech Stack
+
+- **Frontend**: React 18 (Vite), Zustand (State), React Query (Data Fetching), Zod (Validation).
+- **Backend**: Express.js, Mongoose (ODM), JWT (Auth), node-cron (Automated Attendance).
 
 ## Demo Credentials
 
@@ -55,32 +65,3 @@ Open http://localhost:5173
 | Member | arjun@corp.io     | pass123  |
 | Member | priya@corp.io     | pass123  |
 | Admin  | admin@corp.io     | admin123 |
-
-## Tech Stack
-
-- **Frontend**: React 18, Vite, Zustand, React Query, React Router, Zod
-- **Backend**: Node.js, Express.js, MongoDB, Mongoose, JWT
-- **Auth**: JWT (localStorage) + bcryptjs
-- **Styling**: Custom CSS (no framework dependency)
-- **Scheduling**: node-cron (auto-absence marking, buffer allocation)
-
-## Project Structure
-
-```
-seatsync/
-├── frontend/          # React app
-│   └── src/
-│       ├── components/    # Reusable UI components
-│       ├── pages/         # Page-level components
-│       ├── hooks/         # Custom React hooks
-│       ├── store/         # Zustand stores
-│       ├── utils/         # Helper functions
-│       └── styles/        # Global CSS
-├── backend/           # Express API
-│   ├── routes/        # API routes
-│   ├── models/        # Mongoose schemas
-│   ├── middleware/    # Auth & error middleware
-│   ├── services/      # Business logic
-│   └── config/        # DB & app config
-└── README.md
-```

@@ -1,4 +1,4 @@
-const express  = require('express')
+const express = require('express')
 const mongoose = require('mongoose')
 const { authenticate } = require('../middleware/auth')
 const { Booking, Inventory, Holiday } = require('../models')
@@ -34,7 +34,7 @@ router.post('/', async (req, res, next) => {
     }
 
     const targetDate = new Date(date + 'T00:00:00')
-    const today      = new Date(); today.setHours(0,0,0,0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
 
     // No past bookings
     if (targetDate < today) {
@@ -56,12 +56,12 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ message: `${date} is a holiday: ${holiday.description}` })
     }
 
-    // 14-day advance booking limit for guaranteed
+    // Advance booking limit
     const maxDate = new Date(today)
     maxDate.setDate(maxDate.getDate() + 14)
-    if (seatType === 'GUARANTEED' && targetDate > maxDate) {
+    if (targetDate > maxDate) {
       await session.abortTransaction()
-      return res.status(400).json({ message: 'Guaranteed bookings can only be made up to 14 days in advance.' })
+      return res.status(400).json({ message: 'Bookings can only be made up to 14 days in advance.' })
     }
 
     // Same-day booking closes at 9 AM
@@ -88,26 +88,63 @@ router.post('/', async (req, res, next) => {
     }
 
     // No duplicate booking
-    const existing = await Booking.findOne({ userId: user._id, date, status: { $in: ['BOOKED','CHECKED_IN'] } })
+    const existing = await Booking.findOne({ userId: user._id, date, status: { $in: ['BOOKED', 'CHECKED_IN'] } })
     if (existing) {
       await session.abortTransaction()
       return res.status(409).json({ message: 'You already have a booking for this date.' })
     }
 
-    // Check inventory
+    // Check inventory and windows
     let inv = await Inventory.findOne({ date }).session(session)
     if (!inv) {
       inv = await Inventory.create([{ date, guaranteedTotal: 10, bufferTotal: 10 }], { session })
       inv = inv[0]
     }
 
-    if (seatType === 'GUARANTEED' && inv.guaranteedBooked >= inv.guaranteedTotal) {
-      await session.abortTransaction()
-      return res.status(400).json({ message: 'No guaranteed seats available for this date.' })
-    }
-    if (seatType === 'BUFFER' && inv.bufferBooked >= inv.bufferTotal) {
-      await session.abortTransaction()
-      return res.status(400).json({ message: 'No buffer seats available for this date.' })
+    const { CycleConfig } = require('../models')
+    const cfg = await CycleConfig.findOne().session(session) || { bufferOpen: '15:00', bookingClose: '09:00' }
+
+    if (seatType === 'GUARANTEED') {
+      if (inv.guaranteedBooked >= inv.guaranteedTotal) {
+        await session.abortTransaction()
+        return res.status(400).json({ message: 'No guaranteed seats available for this date.' })
+      }
+    } else {
+      // BUFFER logic: Only 1 day before after 15:00 OR Today before 09:00
+      const now = new Date()
+      const todayStr = formatDate(now)
+
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      const tomorrowStr = formatDate(tomorrow)
+
+      const [openH, openM] = cfg.bufferOpen.split(':').map(Number)
+      const [closeH, closeM] = cfg.bookingClose.split(':').map(Number)
+
+      const isToday = date === todayStr
+      const isTomorrow = date === tomorrowStr
+
+      if (isToday) {
+        const deadline = new Date(now); deadline.setHours(closeH, closeM, 0, 0)
+        if (now >= deadline) {
+          await session.abortTransaction()
+          return res.status(400).json({ message: `Today's buffer booking closed at ${cfg.bookingClose}.` })
+        }
+      } else if (isTomorrow) {
+        const opening = new Date(now); opening.setHours(openH, openM, 0, 0)
+        if (now < opening) {
+          await session.abortTransaction()
+          return res.status(400).json({ message: `Buffer booking for tomorrow opens at ${cfg.bufferOpen}.` })
+        }
+      } else {
+        await session.abortTransaction()
+        return res.status(400).json({ message: 'Buffer seats can only be booked for today or tomorrow.' })
+      }
+
+      if (inv.bufferBooked >= inv.bufferTotal) {
+        await session.abortTransaction()
+        return res.status(400).json({ message: 'No buffer seats available for this date.' })
+      }
     }
 
     // Create booking
@@ -115,7 +152,7 @@ router.post('/', async (req, res, next) => {
 
     // Update inventory
     if (seatType === 'GUARANTEED') inv.guaranteedBooked += 1
-    else                           inv.bufferBooked     += 1
+    else inv.bufferBooked += 1
     await inv.save({ session })
 
     await session.commitTransaction()
@@ -141,8 +178,8 @@ router.patch('/:id/cancel', async (req, res, next) => {
     if (booking.status !== 'BOOKED') { await session.abortTransaction(); return res.status(400).json({ message: 'Only active bookings can be cancelled.' }) }
 
     // Determine if late cancellation (after 9PM previous day)
-    const bookingDate  = new Date(booking.date + 'T00:00:00')
-    const prevDay9PM   = new Date(bookingDate)
+    const bookingDate = new Date(booking.date + 'T00:00:00')
+    const prevDay9PM = new Date(bookingDate)
     prevDay9PM.setDate(prevDay9PM.getDate() - 1)
     prevDay9PM.setHours(21, 0, 0, 0)
     const isLate = new Date() > prevDay9PM
@@ -158,7 +195,7 @@ router.patch('/:id/cancel', async (req, res, next) => {
     const inv = await Inventory.findOne({ date: booking.date }).session(session)
     if (inv) {
       if (booking.seatType === 'GUARANTEED') inv.guaranteedBooked = Math.max(0, inv.guaranteedBooked - 1)
-      else                                   inv.bufferBooked     = Math.max(0, inv.bufferBooked     - 1)
+      else inv.bufferBooked = Math.max(0, inv.bufferBooked - 1)
       await inv.save({ session })
     }
 
@@ -184,8 +221,8 @@ router.patch('/:id/checkin', async (req, res, next) => {
       return res.status(400).json({ message: 'Check-in window has closed (10:00 AM deadline).' })
     }
 
-    booking.status     = 'CHECKED_IN'
-    booking.checkedInAt= now
+    booking.status = 'CHECKED_IN'
+    booking.checkedInAt = now
     await booking.save()
     res.json({ message: 'Checked in successfully!', booking })
   } catch (err) { next(err) }

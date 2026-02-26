@@ -58,10 +58,41 @@ export default function BookSeat() {
     const scheduled = isBatchDay(user.batchId, d)
     if (scheduled) {
       bookMutation.mutate({ date: dateStr, seatType: 'GUARANTEED' })
-    } else if (isTomorrow(d)) {
-      waitlistMutation.mutate(dateStr)
     } else {
-      notify('Buffer seats are only available for the next working day (3PM–9AM window).', 'warning')
+      // Buffer window check logic
+      const now = new Date()
+      const isDayToday = isToday(d)
+      const isDayTomorrow = isTomorrow(d)
+      
+      // Assume defaults if config not loaded (usually handled by separate query if we wanted to be perfect)
+      const bufferOpenTime = 15 // 3 PM
+      const bookingCloseTime = 9 // 9 AM
+
+      if (isDayToday) {
+        if (now.getHours() >= bookingCloseTime) {
+          notify(`Today's buffer booking closed at ${bookingCloseTime}:00 AM.`, 'warning')
+          return
+        }
+      } else if (isDayTomorrow) {
+        if (now.getHours() < bufferOpenTime) {
+          notify(`Tomorrow's buffer booking opens at ${bufferOpenTime}:00 PM today.`, 'warning')
+          return
+        }
+      } else {
+        notify('Buffer seats can only be booked starting from 3 PM the previous day.', 'warning')
+        return
+      }
+
+      bookMutation.mutate({ date: dateStr, seatType: 'BUFFER' }, {
+        onError: (err) => {
+          // If no buffer seats, try waitlist (only if it's tomorrow, although we might phase out waitlist for simplicity as per "automatic" request)
+          if (err.response?.status === 400 && isDayTomorrow) {
+            waitlistMutation.mutate(dateStr)
+          } else {
+            notify(err.response?.data?.message || 'Booking failed.', 'error')
+          }
+        }
+      })
     }
   }
 

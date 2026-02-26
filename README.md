@@ -2,11 +2,14 @@
 
 A full-stack seat booking system for organizations with hybrid work schedules. Built with React + Node.js/Express + MongoDB.
 
+# Video Walkthrough
+https://github.com/user-attachments/assets/bd0231af-9cbc-478b-94f4-c0f37de4e6d6
+
+# Pics
 ![alt text](image.png)
 ![alt text](image-1.png)
 ![alt text](image-2.png)
 ![alt text](image-3.png)
-<video controls src="project-info/vid.mp4" title="Title"></video>
 
 ## Quick Start
 

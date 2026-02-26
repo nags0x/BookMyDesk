@@ -1,73 +1,86 @@
-# Welcome to your Lovable project
+# SeatSync — Hybrid Seat Booking Management System
 
-## Project info
+A full-stack seat booking system for organizations with hybrid work schedules. Built with React + Node.js/Express + MongoDB.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Quick Start
 
-## How can I edit this code?
+### Prerequisites
+- Node.js v18+
+- MongoDB (local or Atlas connection string)
+- npm or yarn
 
-There are several ways of editing your application.
+### 1. Clone & Install
 
-**Use Lovable**
+```bash
+# Install frontend deps
+cd frontend && npm install
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Install backend deps
+cd ../backend && npm install
 ```
 
-**Edit a file directly in GitHub**
+### 2. Configure Environment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Copy env files
+cp frontend/.env.example frontend/.env
+cp backend/.env.example backend/.env
+```
 
-**Use GitHub Codespaces**
+Edit `backend/.env` with your MongoDB URI and JWT secret.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### 3. Seed the Database
 
-## What technologies are used for this project?
+```bash
+cd backend
+npm run seed
+```
 
-This project is built with:
+### 4. Run Development Servers
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+# Terminal 1 — Backend (port 5000)
+cd backend && npm run dev
 
-## How can I deploy this project?
+# Terminal 2 — Frontend (port 5173)
+cd frontend && npm run dev
+```
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Open http://localhost:5173
 
-## Can I connect a custom domain to my Lovable project?
+## Demo Credentials
 
-Yes, you can!
+| Role   | Email             | Password |
+|--------|-------------------|----------|
+| Member | arjun@corp.io     | pass123  |
+| Member | priya@corp.io     | pass123  |
+| Admin  | admin@corp.io     | admin123 |
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Tech Stack
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **Frontend**: React 18, Vite, Zustand, React Query, React Router, Zod
+- **Backend**: Node.js, Express.js, MongoDB, Mongoose, JWT
+- **Auth**: JWT (localStorage) + bcryptjs
+- **Styling**: Custom CSS (no framework dependency)
+- **Scheduling**: node-cron (auto-absence marking, buffer allocation)
+
+## Project Structure
+
+```
+seatsync/
+├── frontend/          # React app
+│   └── src/
+│       ├── components/    # Reusable UI components
+│       ├── pages/         # Page-level components
+│       ├── hooks/         # Custom React hooks
+│       ├── store/         # Zustand stores
+│       ├── utils/         # Helper functions
+│       └── styles/        # Global CSS
+├── backend/           # Express API
+│   ├── routes/        # API routes
+│   ├── models/        # Mongoose schemas
+│   ├── middleware/    # Auth & error middleware
+│   ├── services/      # Business logic
+│   └── config/        # DB & app config
+└── README.md
+```

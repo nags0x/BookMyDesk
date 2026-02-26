@@ -10,6 +10,7 @@ import { displayDate } from '../utils/schedule'
 
 export function MyBookings() {
   const notify = useUIStore(s => s.notify)
+  const updateUser = useAuthStore(s => s.updateUser)
   const qc     = useQueryClient()
   const [filter, setFilter] = useState('ALL')
 
@@ -20,7 +21,12 @@ export function MyBookings() {
 
   const cancelMutation = useMutation({
     mutationFn: (id) => api.patch(`/bookings/${id}/cancel`),
-    onSuccess:  () => { qc.invalidateQueries(['bookings']); notify('Booking cancelled.', 'warning') },
+    onSuccess:  async () => {
+      qc.invalidateQueries(['bookings'])
+      const { data } = await api.get('/auth/me')
+      updateUser(data)
+      notify('Booking cancelled.', 'warning')
+    },
     onError:    (err) => notify(err.response?.data?.message || 'Cancel failed.', 'error'),
   })
   const checkinMutation = useMutation({
@@ -69,9 +75,11 @@ export function MyBookings() {
               </div>
               {b.status === 'BOOKED' && (
                 <div style={{ display: 'flex', gap: 7, flexShrink: 0 }}>
-                  <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: '0.75rem', color: 'var(--green)', borderColor: 'rgba(45,125,90,0.4)' }} onClick={() => checkinMutation.mutate(b._id || b.id)}>
-                    {Icons.check} Check In
-                  </button>
+                  {b.date === new Date().toISOString().slice(0, 10) && (
+                    <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: '0.75rem', color: 'var(--green)', borderColor: 'rgba(45,125,90,0.4)' }} onClick={() => checkinMutation.mutate(b._id || b.id)}>
+                      {Icons.check} Check In
+                    </button>
+                  )}
                   <button className="btn-icon" style={{ width: 32, height: 32, borderColor: 'rgba(196,56,45,0.35)', color: 'var(--red)' }} onClick={() => cancelMutation.mutate(b._id || b.id)}>
                     {Icons.x}
                   </button>
@@ -103,7 +111,7 @@ export function Waitlist() {
     onError:    (err) => notify(err.response?.data?.message || 'Failed.', 'error'),
   })
 
-  const score = Math.max(0, 100 - (user.lateCancels??0)*10 - (user.absences??0)*5 - (user.bufferUsed??0)*2)
+  const score = user.fairnessScore ?? 0
   const mine  = [...waitlist].sort((a, b) => b.date.localeCompare(a.date))
 
   return (

@@ -68,7 +68,7 @@ export default function AuthPage() {
           <div style={{ width: 32, height: 32, background: 'var(--accent)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
             {Icons.seat}
           </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.15rem', letterSpacing: '-0.03em' }}>SeatSync</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: '1.15rem', letterSpacing: '-0.03em' }}>BookMyDesk</span>
         </div>
         <button className="btn-icon" style={{ width: 36, height: 36 }} onClick={toggleDark} title="Toggle theme">
           {dark ? Icons.sun : Icons.moon}

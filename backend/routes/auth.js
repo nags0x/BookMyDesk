@@ -1,6 +1,6 @@
 const express = require('express')
-const jwt     = require('jsonwebtoken')
-const { z }   = require('zod')
+const jwt = require('jsonwebtoken')
+const { z } = require('zod')
 const { User } = require('../models')
 const { authenticate } = require('../middleware/auth')
 
@@ -13,12 +13,12 @@ const signToken = (id) =>
 router.post('/signup', async (req, res, next) => {
   try {
     const schema = z.object({
-      name:     z.string().min(2),
-      email:    z.string().email(),
+      name: z.string().min(2),
+      email: z.string().email(),
       password: z.string().min(4),
-      role:     z.enum(['USER','ADMIN']),
-      batchId:  z.number().int().min(1).max(2).optional(),
-      squadNo:  z.number().int().min(1).max(5).optional(),
+      role: z.enum(['USER', 'ADMIN']),
+      batchId: z.number().int().min(1).max(2).optional(),
+      squadNo: z.number().int().min(1).max(5).optional(),
     })
     const data = schema.parse(req.body)
 
@@ -29,7 +29,7 @@ router.post('/signup', async (req, res, next) => {
       return res.status(400).json({ message: 'Batch and squad are required for members.' })
     }
 
-    const user  = await User.create(data)
+    const user = await User.create(data)
     const token = signToken(user._id)
 
     res.status(201).json({
@@ -84,7 +84,7 @@ router.get('/me', authenticate, (req, res) => {
     role: u.role, status: u.status,
     batchId: u.batchId, squadNo: u.squadNo,
     bufferUsed: u.bufferUsed, lateCancels: u.lateCancels, absences: u.absences,
-    fairnessScore: u.computeFairness(),
+    fairnessScore: u.fairnessScore,
   })
 })
 

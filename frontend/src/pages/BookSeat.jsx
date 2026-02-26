@@ -12,6 +12,7 @@ export default function BookSeat() {
   const notify = useUIStore(s => s.notify)
   const qc    = useQueryClient()
   const today = new Date()
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
 
   const [cal, setCal] = useState({ y: today.getFullYear(), m: today.getMonth() })
 
@@ -27,11 +28,16 @@ export default function BookSeat() {
     queryKey: ['inventory', formatDate(today)],
     queryFn:  () => api.get(`/inventory?date=${formatDate(today)}`).then(r => r.data),
   })
+  const { data: inventoryTmr = {} } = useQuery({
+    queryKey: ['inventory', formatDate(tomorrow)],
+    queryFn:  () => api.get(`/inventory?date=${formatDate(tomorrow)}`).then(r => r.data),
+  })
 
   const bookMutation = useMutation({
     mutationFn: (data) => api.post('/bookings', data),
     onSuccess:  (_, vars) => {
       qc.invalidateQueries(['bookings'])
+      qc.invalidateQueries(['inventory'])
       notify(vars.seatType === 'GUARANTEED' ? 'Guaranteed seat booked!' : 'Buffer seat booked!')
     },
     onError: (err) => notify(err.response?.data?.message || 'Booking failed.', 'error'),
@@ -190,8 +196,8 @@ export default function BookSeat() {
           <div className="card anim-fade-up-2" style={{ padding: '18px 20px' }}>
             <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: 14 }}>Today's Availability</div>
             {[
-              { label: 'Guaranteed', total: inventory.guaranteedTotal || 10, booked: inventory.guaranteedBooked || 0, color: 'var(--blue)' },
-              { label: 'Buffer',     total: inventory.bufferTotal || 10,     booked: inventory.bufferBooked || 0,     color: 'var(--green)' },
+              { label: 'Guaranteed', total: inventory.guaranteedTotal    || 10, booked: inventory.guaranteedBooked    || 0, color: 'var(--blue)'  },
+              { label: 'Buffer',     total: inventoryTmr.bufferTotal      || 10, booked: inventoryTmr.bufferBooked      || 0, color: 'var(--green)' },
             ].map((s, i) => (
               <div key={i} style={{ marginBottom: i === 0 ? 14 : 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>

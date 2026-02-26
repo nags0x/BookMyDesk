@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import useUIStore   from '../store/uiStore'
 import { RadialScore, StatCard, MiniBar, StatusPill, SectionHeader, Empty } from '../components/UI'
 import Icons from '../components/Icons'
 import api from '../utils/api'
@@ -8,7 +9,9 @@ import { isBatchDay, computeFairness, displayDate } from '../utils/schedule'
 
 export default function Dashboard() {
   const user    = useAuthStore(s => s.user)
+  const notify  = useUIStore(s => s.notify)
   const navigate = useNavigate()
+  const qc      = useQueryClient()
   const today   = new Date()
   const score   = computeFairness(user)
 
@@ -17,6 +20,23 @@ export default function Dashboard() {
     queryFn:  () => api.get('/bookings/my').then(r => r.data),
   })
 
+  const { data: waitlist = [], refetch: refetchWaitlist } = useQuery({
+    queryKey: ['waitlist', 'mine'],
+    queryFn:  () => api.get('/waitlist/my').then(r => r.data),
+  })
+
+  const respondMutation = useMutation({
+    mutationFn: ({ id, action }) => api.patch(`/waitlist/${id}/respond`, { action }),
+    onSuccess: (res) => {
+      notify(res.data.message)
+      qc.invalidateQueries(['bookings'])
+      qc.invalidateQueries(['inventory'])
+      refetchWaitlist()
+    },
+    onError: (err) => notify(err.response?.data?.message || 'Action failed.', 'error'),
+  })
+
+  const offers = waitlist.filter(w => w.status === 'OFFERED')
   const active   = bookings.filter(b => b.status === 'BOOKED')
   const checked  = bookings.filter(b => b.status === 'CHECKED_IN')
   const upcoming = [...bookings]
@@ -53,13 +73,43 @@ export default function Dashboard() {
         <RadialScore score={score} />
       </div>
 
-      {/* Stat cards */}
       <div className="anim-fade-up-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 12 }}>
         <StatCard label="Active Bookings" value={active.length}  color="var(--blue)"  />
         <StatCard label="Check-ins"       value={checked.length} color="var(--green)" />
         <StatCard label="Late Cancels"    value={user.lateCancels} color="var(--amber)" />
         <StatCard label="Absences"        value={user.absences}  color="var(--red)"   />
       </div>
+
+      {/* Seat Offers */}
+      {offers.map(offer => (
+        <div key={offer._id} className="card anim-pop-in" style={{ padding: '16px 20px', border: '2px solid var(--accent)', background: 'var(--accent-bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ color: 'var(--accent)', fontSize: '1.2rem' }}>{Icons.star}</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--accent)' }}>Seat Available!</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-sub)' }}>A seat opened up for {displayDate(offer.date)}. Do you want to accept it?</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button 
+              className="btn-primary" 
+              style={{ padding: '6px 16px', fontSize: '0.8rem' }}
+              onClick={() => respondMutation.mutate({ id: offer._id, action: 'ACCEPT' })}
+              disabled={respondMutation.isPending}
+            >
+              Accept
+            </button>
+            <button 
+              className="btn-ghost" 
+              style={{ padding: '6px 16px', fontSize: '0.8rem', border: '1px solid var(--border)' }}
+              onClick={() => respondMutation.mutate({ id: offer._id, action: 'REJECT' })}
+              disabled={respondMutation.isPending}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      ))}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16 }}>
 

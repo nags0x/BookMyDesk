@@ -19,11 +19,29 @@ async function runAttendanceCron() {
     }
 
     if (noShows.length > 0) {
-      // Add freed guaranteed seats to buffer pool
       const inv = await Inventory.findOne({ date: today })
       if (inv) {
-        inv.bufferTotal += noShows.filter(b => b.seatType === 'GUARANTEED').length
+        // Correct balancing:
+        // 1. Count actual no-shows that were guaranteed
+        const guaranteedFreed = noShows.filter(b => b.seatType === 'GUARANTEED').length
+
+        // 2. Adjust totals: Decrease guaranteed pool, Increase buffer pool
+        inv.guaranteedTotal -= guaranteedFreed
+        inv.guaranteedBooked -= guaranteedFreed // They are no longer 'booked' in the active sense
+        inv.bufferTotal += guaranteedFreed
+
         await inv.save()
+
+        // Trigger OFFERS for waitlist
+        const pending = await WaitlistEntry.find({ date: today, status: 'PENDING' }).sort({ priorityScore: -1, requestTime: 1 })
+
+        // Number of available spots is now (new bufferTotal - bufferBooked)
+        // But we specifically trigger as many offers as there were no-shows
+        for (let i = 0; i < Math.min(noShows.length, pending.length); i++) {
+          pending[i].status = 'OFFERED'
+          await pending[i].save()
+          console.log(`[CRON] Seat offered to user ${pending[i].userId} for ${today}`)
+        }
       }
       console.log(`[CRON] Marked ${noShows.length} bookings as ABSENT for ${today}`)
     }
@@ -53,9 +71,9 @@ async function runBufferAllocationCron() {
 
     // Sort by fairness: lowest bufferUsed → lowest lateCancels → lowest absences → earliest requestTime
     const sorted = pending.sort((a, b) => {
-      if (a.userId.bufferUsed !== b.userId.bufferUsed)   return a.userId.bufferUsed  - b.userId.bufferUsed
+      if (a.userId.bufferUsed !== b.userId.bufferUsed) return a.userId.bufferUsed - b.userId.bufferUsed
       if (a.userId.lateCancels !== b.userId.lateCancels) return a.userId.lateCancels - b.userId.lateCancels
-      if (a.userId.absences !== b.userId.absences)       return a.userId.absences    - b.userId.absences
+      if (a.userId.absences !== b.userId.absences) return a.userId.absences - b.userId.absences
       return a.requestTime - b.requestTime
     })
 
@@ -67,7 +85,7 @@ async function runBufferAllocationCron() {
         continue
       }
       // Check for existing booking
-      const exists = await Booking.findOne({ userId: entry.userId._id, date: today, status: { $in: ['BOOKED','CHECKED_IN'] } })
+      const exists = await Booking.findOne({ userId: entry.userId._id, date: today, status: { $in: ['BOOKED', 'CHECKED_IN'] } })
       if (exists) {
         entry.status = 'REJECTED'
         await entry.save()

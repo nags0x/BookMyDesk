@@ -187,15 +187,22 @@ router.patch('/:id/cancel', async (req, res, next) => {
     booking.status = isLate ? 'LATE_CANCEL' : 'CANCELLED'
     await booking.save({ session })
 
-    if (isLate) {
-      await require('../models').User.findByIdAndUpdate(req.user._id, { $inc: { lateCancels: 1 } }, { session })
-    }
+    // Decrease fairness score by 100 for every cancellation
+    const userUpdate = { $inc: { fairnessScore: -100 } }
+    if (isLate) userUpdate.$inc.lateCancels = 1
+    await require('../models').User.findByIdAndUpdate(req.user._id, userUpdate, { session })
 
     // Release seat
     const inv = await Inventory.findOne({ date: booking.date }).session(session)
     if (inv) {
-      if (booking.seatType === 'GUARANTEED') inv.guaranteedBooked = Math.max(0, inv.guaranteedBooked - 1)
-      else inv.bufferBooked = Math.max(0, inv.bufferBooked - 1)
+      if (booking.seatType === 'GUARANTEED') {
+        inv.guaranteedBooked = Math.max(0, inv.guaranteedBooked - 1)
+        // Reallocate freed guaranteed seat to buffer pool
+        inv.guaranteedTotal = Math.max(0, inv.guaranteedTotal - 1)
+        inv.bufferTotal += 1
+      } else {
+        inv.bufferBooked = Math.max(0, inv.bufferBooked - 1)
+      }
       await inv.save({ session })
     }
 
@@ -217,7 +224,14 @@ router.patch('/:id/checkin', async (req, res, next) => {
     if (booking.status !== 'BOOKED') return res.status(400).json({ message: 'Booking is not in BOOKED status.' })
 
     const now = new Date()
-    if (now.getHours() >= 10 && formatDate(now) === booking.date) {
+    const todayStr = formatDate(now)
+
+    // Only allow check-in on the day of the booking
+    if (todayStr !== booking.date) {
+      return res.status(400).json({ message: 'You can only check in on the day of your booking.' })
+    }
+
+    if (now.getHours() >= 10) {
       return res.status(400).json({ message: 'Check-in window has closed (10:00 AM deadline).' })
     }
 

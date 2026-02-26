@@ -1,20 +1,32 @@
 require('dotenv').config()
-const express  = require('express')
-const cors     = require('cors')
+const express = require('express')
+const cors = require('cors')
 const mongoose = require('mongoose')
-const cron     = require('node-cron')
+const cron = require('node-cron')
 
-const authRoutes    = require('./routes/auth')
+const authRoutes = require('./routes/auth')
 const bookingRoutes = require('./routes/bookings')
 const { wRouter: waitlistRoutes, iRouter: inventoryRoutes, aRouter: adminRoutes } = require('./routes/other')
 const { runAttendanceCron, runBufferAllocationCron } = require('./services/cronJobs')
 
-const app  = express()
+const app = express()
 const PORT = process.env.PORT || 5000
 
 // ── Middleware ───────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  process.env.FRONTEND_URL,
+].filter(Boolean)
+
 app.use(cors({
-  origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
   credentials: true,
 }))
 app.use(express.json())
@@ -26,18 +38,18 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/auth',      authRoutes)
-app.use('/api/bookings',  bookingRoutes)
-app.use('/api/waitlist',  waitlistRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api/bookings', bookingRoutes)
+app.use('/api/waitlist', waitlistRoutes)
 app.use('/api/inventory', inventoryRoutes)
-app.use('/api/admin',     adminRoutes)
+app.use('/api/admin', adminRoutes)
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date() }))
 
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   console.error(err)
-  const status  = err.status || 500
+  const status = err.status || 500
   const message = err.message || 'Internal server error'
   res.status(status).json({ message })
 })
